@@ -1,4 +1,119 @@
-# model-router
-Dynamic model routing with benchmark creation for developers
+# Switchboard
 
-**Product plan (Switchboard MVP):** [docs/SWITCHBOARD_PLAN.md](docs/SWITCHBOARD_PLAN.md)
+An MCP server that any coding agent uses to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically benchmark them to find exactly which model produces the best outputs.
+
+## What it does
+
+1. **Searches** HuggingFace + OpenRouter to find the best open-source model candidates for your task
+2. **Benchmarks** each model with auto-generated test cases
+3. **Judges** outputs using Claude as an LLM-as-judge
+4. **Checks safety** with White Circle AI
+5. **Stores results** in a shared Neon Postgres database so the community benefits
+6. **Shows results** on a polished web dashboard with charts and tables
+
+## Quick start
+
+```bash
+# Install dependencies
+npm install
+cd web && npm install && cd ..
+
+# Copy .env and fill in your keys
+cp .env.example .env
+
+# Run the database schema (use Neon MCP or psql)
+# psql $NEON_DATABASE_URL < sql/schema.sql
+
+# Start the API server
+npm run api
+
+# Start the web dashboard (separate terminal)
+cd web && npm run dev
+```
+
+## MCP Setup (Cursor)
+
+Add to your project's `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "switchboard": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "/path/to/switchboard",
+      "env": {
+        "OPENROUTER_API_KEY": "your-key",
+        "ANTHROPIC_API_KEY": "your-key",
+        "NEON_DATABASE_URL": "postgres://...",
+        "WHITECIRCLE_API_TOKEN": "your-token"
+      }
+    }
+  }
+}
+```
+
+## MCP Tools
+
+### `switchboard_find_models`
+Search 13,000+ models and shared benchmark results for your use case.
+- Input: `{ use_case: string, max_models?: number }`
+- Returns: Top 10 model candidates + any existing community benchmark results
+
+### `switchboard_benchmark`
+Benchmark models on your use case with auto-generated test cases.
+- Input: `{ use_case: string, models?: string[], num_test_cases?: number }`
+- Returns: Ranked results + dashboard URL
+
+### `switchboard_results`
+Retrieve detailed results for a benchmark run.
+- Input: `{ run_id: string }`
+- Returns: Full run details with per-model summaries and per-test-case breakdowns
+
+## Architecture
+
+```
+Coding Agent (Cursor)
+    |
+    | stdio
+    v
+MCP Server ──> HuggingFace Search ──> OpenRouter Cross-Reference
+    |
+    ├──> Benchmark Engine
+    |       ├── Test Case Generator (Claude)
+    |       ├── Model Executor (OpenRouter, 300+ models)
+    |       ├── LLM Judge (Claude)
+    |       └── Safety Check (White Circle AI)
+    |
+    ├──> Shared Database (Neon Postgres)
+    |
+    └──> Web Dashboard (React + Recharts)
+```
+
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | For running open-source models |
+| `ANTHROPIC_API_KEY` | Yes | For test generation + LLM judge |
+| `NEON_DATABASE_URL` | Yes | Shared Postgres database |
+| `WHITECIRCLE_API_TOKEN` | No | White Circle AI safety checks |
+| `WHITECIRCLE_ENDPOINT` | No | Defaults to `https://api.whitecircle.ai` |
+| `SWITCHBOARD_JUDGE_MODEL` | No | Defaults to `claude-sonnet-4-20250514` |
+
+## Testing
+
+```bash
+npm test
+```
+
+## Tech stack
+
+- **MCP**: `@modelcontextprotocol/sdk` (stdio transport)
+- **API**: Hono + `@hono/node-server`
+- **DB**: Neon Postgres (`@neondatabase/serverless`)
+- **Inference**: OpenRouter (300+ models, single API)
+- **Judge**: Anthropic Claude
+- **Safety**: White Circle AI
+- **Frontend**: Vite + React + Tailwind CSS + Recharts
+- **Tests**: Vitest
