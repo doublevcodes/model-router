@@ -4,7 +4,7 @@ An MCP server that any coding agent can use to search across 13,000+ HuggingFace
 
 Why rely on existing benchmarks when you can make your own custom experiments and find out what model is really best to use in your app? 
 
-Now you can.
+With Switchboard, you can.
 
 ## For example...
 
