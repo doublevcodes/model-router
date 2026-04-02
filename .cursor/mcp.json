@@ -4,10 +4,9 @@
       "command": "npx",
       "args": ["tsx", "src/mcp/server.ts"],
       "env": {
-        "OPENROUTER_API_KEY": "",
-        "ANTHROPIC_API_KEY": "",
-        "NEON_DATABASE_URL": "",
-        "WHITECIRCLE_API_TOKEN": "",
+        "OPENROUTER_API_KEY": "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",
+        "ANTHROPIC_API_KEY": "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",
+        "WHITECIRCLE_API_TOKEN": "wc-40c4173986f30a3157b235756defc2fd",
         "WHITECIRCLE_ENDPOINT": "https://api.whitecircle.ai",
         "SWITCHBOARD_JUDGE_MODEL": "claude-sonnet-4-20250514"
       }
