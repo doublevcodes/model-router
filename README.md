@@ -1,15 +1,16 @@
 # Switchboard
 
-An MCP server that any coding agent uses to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically benchmark them to find exactly which model produces the best outputs.
+An MCP server that any coding agent can use to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically benchmark them to find exactly which model produces the best outputs.
 
 ## What it does
 
-1. **Searches** HuggingFace + OpenRouter to find the best open-source model candidates for your task
+0. **Integrates** into your AI development environment as an MCP for coding agents
+1. **Searches** HuggingFace + OpenRouter to find the best open-source model candidates for your specific use-case
 2. **Benchmarks** each model with auto-generated test cases
 3. **Judges** outputs using Claude as an LLM-as-judge
-4. **Checks safety** with White Circle AI
+4. **Checks safety standards** of each benchmarked model with White Circle AI
 5. **Stores results** in a shared Neon Postgres database so the community benefits
-6. **Shows results** on a polished web dashboard with charts and tables
+6. **Shows results** on a web dashboard
 
 ## Quick start
 
