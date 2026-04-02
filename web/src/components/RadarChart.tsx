@@ -21,7 +21,10 @@ export default function RadarChart({ summaries }: RadarChartProps) {
 
   if (top3.length === 0) return null;
 
-  const maxLatency = Math.max(...summaries.map((s) => s.avgLatencyMs), 1);
+  const latencies = summaries.map((s) => s.avgLatencyMs);
+  const minLatency = Math.min(...latencies);
+  const maxLatency = Math.max(...latencies);
+  const latencyRange = maxLatency - minLatency;
 
   const data = [
     {
@@ -37,7 +40,9 @@ export default function RadarChart({ summaries }: RadarChartProps) {
       ...Object.fromEntries(
         top3.map((s) => [
           s.modelId,
-          Math.round((1 - s.avgLatencyMs / maxLatency) * 100),
+          latencyRange > 0
+            ? Math.round((1 - (s.avgLatencyMs - minLatency) / latencyRange) * 100)
+            : 100,
         ])
       ),
     },

@@ -1,49 +1,49 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { BenchmarkRunRow } from '../types';
+import { useFetch } from '../hooks/useFetch';
+import { useDebounce } from '../hooks/useDebounce';
+import { RunListSkeleton } from '../components/Skeleton';
 
 export default function Search() {
-  const [runs, setRuns] = useState<BenchmarkRunRow[]>([]);
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [query, setQuery] = useState(params.get('q') || '');
+  const debouncedQuery = useDebounce(query, 300);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const url = debouncedQuery.trim()
+    ? `/api/search?q=${encodeURIComponent(debouncedQuery.trim())}`
+    : '/api/runs';
+
+  const { data, loading, error, retry } = useFetch<{ runs: BenchmarkRunRow[] }>(
+    url,
+    { keepPreviousData: true },
+  );
+  const runs = data?.runs || [];
 
   useEffect(() => {
-    fetchRuns();
+    const next: Record<string, string> = {};
+    if (debouncedQuery.trim()) next.q = debouncedQuery.trim();
+    setParams(next, { replace: true });
+  }, [debouncedQuery, setParams]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.key === '/' &&
+        !(
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement
+        )
+      ) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
-
-  const fetchRuns = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/runs');
-      if (!res.ok) throw new Error('Failed to fetch runs');
-      const data = await res.json();
-      setRuns(data.runs || []);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!query.trim()) {
-      fetchRuns();
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Search failed');
-      const data = await res.json();
-      setRuns(data.runs || []);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const statusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -70,42 +70,57 @@ export default function Search() {
         </p>
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Search use cases..."
-          className="flex-1 bg-switchboard-card border border-switchboard-border rounded-lg px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-switchboard-accent/50 focus:border-switchboard-accent"
-        />
-        <button
-          onClick={handleSearch}
-          className="px-6 py-2.5 bg-switchboard-accent text-white rounded-lg font-medium hover:bg-switchboard-accent-light transition-colors"
-        >
-          Search
-        </button>
+      <div className="relative mb-6">
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            placeholder="Search use cases..."
+            className="w-full bg-switchboard-card border border-switchboard-border rounded-lg px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-switchboard-accent/50 focus:border-switchboard-accent pr-10"
+          />
+          {!inputFocused && !query && (
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-gray-500 border border-switchboard-border rounded bg-switchboard-bg">
+              /
+            </kbd>
+          )}
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6 text-red-400 text-sm">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6 flex items-center justify-between">
+          <span className="text-red-400 text-sm">{error}</span>
+          <button
+            onClick={retry}
+            className="text-sm text-red-400 hover:text-red-300 font-medium underline underline-offset-2"
+          >
+            Try again
+          </button>
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin h-8 w-8 border-2 border-switchboard-accent border-t-transparent rounded-full" />
-        </div>
+      {loading && !data ? (
+        <RunListSkeleton />
       ) : runs.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
-          <p className="text-lg mb-2">No benchmark runs found</p>
+          <p className="text-lg mb-2">
+            {query.trim()
+              ? 'No matching benchmarks found'
+              : 'No benchmark runs found'}
+          </p>
           <p className="text-sm">
-            Use the Switchboard MCP in Cursor to create your first benchmark.
+            {query.trim()
+              ? 'Try a different search term.'
+              : 'Use the Switchboard MCP in Cursor to create your first benchmark.'}
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div
+          className={`space-y-3 transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}
+        >
           {runs.map((run) => (
             <Link
               key={run.id}
