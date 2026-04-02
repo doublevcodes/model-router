@@ -1,10 +1,15 @@
 # Switchboard
 
-An MCP server that any coding agent can use to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically benchmark them to find exactly which model produces the best outputs for the skill you need them for.
+An MCP server that any coding agent can use to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically create benchmarks to test the candidate models and find exactly which model produces the best outputs for the skill you need them for.
 
 Current AI benchmarks in research only test across a limited set of skills.... why not make your own custom experiments and find out what models are really best for your agentic app? 
 
 Now you can.
+
+## EXAMPLE
+
+You’re building a text-to-CAD product where an LLM agent reads a natural-language brief (e.g. “bracket with two M4 holes on a 40 mm pitch, 5 mm fillets, export as STEP”) and writes executable geometry code—OpenSCAD, CadQuery, or a parametric DSL—that your pipeline turns into meshes and manufacturing-ready solids. The hard part isn’t picking any model: it’s finding one that respects dimensions and constraints, keeps topology sane (no self-intersections, watertight shells), and iterates when the compiler or validator fails. You wire Switchboard into Cursor: your coding agent calls switchboard_find_models with a use case like “generate parametric 3D CAD via code from text, with units, constraints, and export to mesh/STEP,” then switchboard_benchmark on prompts that mix easy prismatic parts, tight tolerances, assemblies, and failure cases (ambiguous specs, over-constrained sketches). The judge scores not just prose but whether the implied solid is buildable and dimensionally consistent; results land in your dashboard so you pick—for example—the model that wins on constraint fidelity + repair loops under your latency budget instead of whatever was trendy on Twitter last week.
+
 
 ## What Switchboard does
 
