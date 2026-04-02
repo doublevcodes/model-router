@@ -1,37 +1,131 @@
-import { neon } from '@neondatabase/serverless';
-import { config } from './config.js';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 import type { BenchmarkRun, BenchmarkResult, Model, ModelSummary } from './types.js';
 
-function getDb() {
-  return neon(config.neonDatabaseUrl);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = resolve(__dirname, '../../data');
+const STORE_PATH = resolve(DATA_DIR, 'store.json');
+
+interface Store {
+  runs: Array<{
+    id: string;
+    use_case: string;
+    use_case_slug: string;
+    status: string;
+    created_at: string;
+    completed_at: string | null;
+  }>;
+  models: Array<{
+    id: string;
+    name: string;
+    provider: string;
+    parameter_count: number | null;
+    huggingface_id: string;
+    tags: string[];
+  }>;
+  test_cases: Array<{
+    id: string;
+    run_id: string;
+    input: string;
+    expected_behavior: string;
+    category: string;
+  }>;
+  results: Array<{
+    id: string;
+    run_id: string;
+    model_id: string;
+    test_case_id: string;
+    output: string;
+    score: number;
+    latency_ms: number;
+    tokens_in: number;
+    tokens_out: number;
+    safety_score: number | null;
+    safety_violations: string[];
+    judge_reasoning: string;
+    created_at: string;
+  }>;
 }
 
+function loadStore(): Store {
+  try {
+    if (existsSync(STORE_PATH)) {
+      return JSON.parse(readFileSync(STORE_PATH, 'utf-8'));
+    }
+  } catch {
+    // Corrupted file — start fresh
+  }
+  return { runs: [], models: [], test_cases: [], results: [] };
+}
+
+function saveStore(store: Store): void {
+  if (!existsSync(DATA_DIR)) {
+    mkdirSync(DATA_DIR, { recursive: true });
+  }
+  writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+}
+
+let store = loadStore();
+
 export async function insertBenchmarkRun(useCase: string, useCaseSlug: string): Promise<string> {
-  const sql = getDb();
-  const rows = await sql`INSERT INTO benchmark_runs (use_case, use_case_slug, status) VALUES (${useCase}, ${useCaseSlug}, 'pending') RETURNING id`;
-  return rows[0].id;
+  const id = randomUUID();
+  store.runs.push({
+    id,
+    use_case: useCase,
+    use_case_slug: useCaseSlug,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    completed_at: null,
+  });
+  saveStore(store);
+  return id;
 }
 
 export async function updateRunStatus(runId: string, status: string): Promise<void> {
-  const sql = getDb();
-  if (status === 'completed' || status === 'failed') {
-    await sql`UPDATE benchmark_runs SET status = ${status}, completed_at = now() WHERE id = ${runId}`;
-  } else {
-    await sql`UPDATE benchmark_runs SET status = ${status} WHERE id = ${runId}`;
+  const run = store.runs.find((r) => r.id === runId);
+  if (run) {
+    run.status = status;
+    if (status === 'completed' || status === 'failed') {
+      run.completed_at = new Date().toISOString();
+    }
+    saveStore(store);
   }
 }
 
 export async function upsertModel(model: Model): Promise<void> {
-  const sql = getDb();
-  await sql`INSERT INTO models (id, name, provider, parameter_count, huggingface_id, tags)
-    VALUES (${model.openrouterId}, ${model.name}, ${model.provider}, ${model.parameterCount}, ${model.huggingfaceId}, ${model.tags})
-    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, provider = EXCLUDED.provider, parameter_count = EXCLUDED.parameter_count, huggingface_id = EXCLUDED.huggingface_id, tags = EXCLUDED.tags`;
+  const existing = store.models.find((m) => m.id === model.openrouterId);
+  if (existing) {
+    existing.name = model.name;
+    existing.provider = model.provider;
+    existing.parameter_count = model.parameterCount;
+    existing.huggingface_id = model.huggingfaceId;
+    existing.tags = model.tags;
+  } else {
+    store.models.push({
+      id: model.openrouterId,
+      name: model.name,
+      provider: model.provider,
+      parameter_count: model.parameterCount,
+      huggingface_id: model.huggingfaceId,
+      tags: model.tags,
+    });
+  }
+  saveStore(store);
 }
 
 export async function insertTestCase(runId: string, testCase: { input: string; expectedBehavior: string; category: string }): Promise<string> {
-  const sql = getDb();
-  const rows = await sql`INSERT INTO test_cases (run_id, input, expected_behavior, category) VALUES (${runId}, ${testCase.input}, ${testCase.expectedBehavior}, ${testCase.category}) RETURNING id`;
-  return rows[0].id;
+  const id = randomUUID();
+  store.test_cases.push({
+    id,
+    run_id: runId,
+    input: testCase.input,
+    expected_behavior: testCase.expectedBehavior,
+    category: testCase.category,
+  });
+  saveStore(store);
+  return id;
 }
 
 export async function insertBenchmarkResult(result: {
@@ -47,84 +141,112 @@ export async function insertBenchmarkResult(result: {
   safetyViolations: string[];
   judgeReasoning: string;
 }): Promise<string> {
-  const sql = getDb();
-  const rows = await sql`INSERT INTO benchmark_results (run_id, model_id, test_case_id, output, score, latency_ms, tokens_in, tokens_out, safety_score, safety_violations, judge_reasoning)
-    VALUES (${result.runId}, ${result.modelId}, ${result.testCaseId}, ${result.output}, ${result.score}, ${result.latencyMs}, ${result.tokensIn}, ${result.tokensOut}, ${result.safetyScore}, ${result.safetyViolations}, ${result.judgeReasoning})
-    RETURNING id`;
-  return rows[0].id;
+  const id = randomUUID();
+  store.results.push({
+    id,
+    run_id: result.runId,
+    model_id: result.modelId,
+    test_case_id: result.testCaseId,
+    output: result.output,
+    score: result.score,
+    latency_ms: result.latencyMs,
+    tokens_in: result.tokensIn,
+    tokens_out: result.tokensOut,
+    safety_score: result.safetyScore,
+    safety_violations: result.safetyViolations,
+    judge_reasoning: result.judgeReasoning,
+    created_at: new Date().toISOString(),
+  });
+  saveStore(store);
+  return id;
 }
 
 export async function getRunById(runId: string): Promise<BenchmarkRun | null> {
-  const sql = getDb();
-  const runs = await sql`SELECT * FROM benchmark_runs WHERE id = ${runId}`;
-  if (runs.length === 0) return null;
-  const run = runs[0];
-  const testCases = await sql`SELECT * FROM test_cases WHERE run_id = ${runId}`;
+  const run = store.runs.find((r) => r.id === runId);
+  if (!run) return null;
+  const testCases = store.test_cases.filter((tc) => tc.run_id === runId);
   return {
     id: run.id,
     useCase: run.use_case,
     useCaseSlug: run.use_case_slug,
     models: [],
-    testCases: testCases.map((tc: any) => ({ id: tc.id, input: tc.input, expectedBehavior: tc.expected_behavior, category: tc.category })),
-    status: run.status,
+    testCases: testCases.map((tc) => ({
+      id: tc.id,
+      input: tc.input,
+      expectedBehavior: tc.expected_behavior,
+      category: tc.category,
+    })),
+    status: run.status as BenchmarkRun['status'],
     createdAt: new Date(run.created_at),
     completedAt: run.completed_at ? new Date(run.completed_at) : null,
   };
 }
 
 export async function getResultsByRun(runId: string): Promise<BenchmarkResult[]> {
-  const sql = getDb();
-  const rows = await sql`SELECT * FROM benchmark_results WHERE run_id = ${runId} ORDER BY score DESC`;
-  return rows.map((r: any) => ({
-    id: r.id,
-    runId: r.run_id,
-    modelId: r.model_id,
-    testCaseId: r.test_case_id,
-    output: r.output,
-    score: r.score,
-    latencyMs: r.latency_ms,
-    tokensIn: r.tokens_in,
-    tokensOut: r.tokens_out,
-    safetyScore: r.safety_score,
-    safetyViolations: r.safety_violations || [],
-    judgeReasoning: r.judge_reasoning,
-  }));
+  return store.results
+    .filter((r) => r.run_id === runId)
+    .sort((a, b) => b.score - a.score)
+    .map((r) => ({
+      id: r.id,
+      runId: r.run_id,
+      modelId: r.model_id,
+      testCaseId: r.test_case_id,
+      output: r.output,
+      score: r.score,
+      latencyMs: r.latency_ms,
+      tokensIn: r.tokens_in,
+      tokensOut: r.tokens_out,
+      safetyScore: r.safety_score,
+      safetyViolations: r.safety_violations || [],
+      judgeReasoning: r.judge_reasoning,
+    }));
 }
 
 export async function getModelSummaries(runId: string): Promise<ModelSummary[]> {
-  const sql = getDb();
-  const rows = await sql`
-    SELECT 
-      br.model_id,
-      m.name as model_name,
-      AVG(br.score) as overall_score,
-      AVG(br.score) as accuracy_score,
-      AVG(br.safety_score) as safety_score,
-      AVG(br.latency_ms) as avg_latency_ms,
-      AVG(br.tokens_out) as avg_tokens_out
-    FROM benchmark_results br
-    JOIN models m ON m.id = br.model_id
-    WHERE br.run_id = ${runId}
-    GROUP BY br.model_id, m.name
-    ORDER BY overall_score DESC
-  `;
-  return rows.map((r: any, i: number) => ({
-    modelId: r.model_id,
-    modelName: r.model_name,
-    overallScore: Math.round(r.overall_score * 100) / 100,
-    accuracyScore: Math.round(r.accuracy_score * 100) / 100,
-    safetyScore: r.safety_score ? Math.round(r.safety_score * 100) / 100 : 0,
-    avgLatencyMs: Math.round(r.avg_latency_ms),
-    avgTokensOut: Math.round(r.avg_tokens_out),
-    rank: i + 1,
-  }));
+  const runResults = store.results.filter((r) => r.run_id === runId);
+  const byModel = new Map<string, typeof runResults>();
+
+  for (const r of runResults) {
+    if (!byModel.has(r.model_id)) byModel.set(r.model_id, []);
+    byModel.get(r.model_id)!.push(r);
+  }
+
+  const summaries: ModelSummary[] = [];
+  for (const [modelId, results] of byModel) {
+    const model = store.models.find((m) => m.id === modelId);
+    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+    const scores = results.map((r) => r.score);
+    const safetyScores = results.map((r) => r.safety_score).filter((s): s is number => s !== null);
+    const latencies = results.map((r) => r.latency_ms);
+    const tokensOut = results.map((r) => r.tokens_out);
+
+    summaries.push({
+      modelId,
+      modelName: model?.name || modelId.split('/').pop() || modelId,
+      overallScore: Math.round(avg(scores) * 100) / 100,
+      accuracyScore: Math.round(avg(scores) * 100) / 100,
+      safetyScore: safetyScores.length > 0 ? Math.round(avg(safetyScores) * 100) / 100 : 0,
+      avgLatencyMs: Math.round(avg(latencies)),
+      avgTokensOut: Math.round(avg(tokensOut)),
+      rank: 0,
+    });
+  }
+
+  summaries.sort((a, b) => b.overallScore - a.overallScore);
+  summaries.forEach((s, i) => (s.rank = i + 1));
+  return summaries;
 }
 
 export async function searchExistingResults(useCaseSlug: string): Promise<{ runId: string; useCase: string; summaries: ModelSummary[] }[]> {
-  const sql = getDb();
-  const runs = await sql`SELECT * FROM benchmark_runs WHERE use_case_slug ILIKE ${'%' + useCaseSlug + '%'} AND status = 'completed' ORDER BY created_at DESC LIMIT 5`;
+  const slug = useCaseSlug.toLowerCase();
+  const matchingRuns = store.runs
+    .filter((r) => r.use_case_slug.toLowerCase().includes(slug) && r.status === 'completed')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
+
   const results = [];
-  for (const run of runs) {
+  for (const run of matchingRuns) {
     const summaries = await getModelSummaries(run.id);
     results.push({ runId: run.id, useCase: run.use_case, summaries });
   }
@@ -132,11 +254,18 @@ export async function searchExistingResults(useCaseSlug: string): Promise<{ runI
 }
 
 export async function getAllRuns(): Promise<any[]> {
-  const sql = getDb();
-  return sql`SELECT * FROM benchmark_runs ORDER BY created_at DESC`;
+  return [...store.runs].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 export async function searchRuns(query: string): Promise<any[]> {
-  const sql = getDb();
-  return sql`SELECT * FROM benchmark_runs WHERE use_case ILIKE ${'%' + query + '%'} ORDER BY created_at DESC`;
+  const q = query.toLowerCase();
+  return store.runs
+    .filter((r) => r.use_case.toLowerCase().includes(q))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function _resetStoreForTests(): void {
+  store = { runs: [], models: [], test_cases: [], results: [] };
 }

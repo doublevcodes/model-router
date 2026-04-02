@@ -6,7 +6,6 @@ describe('Config', () => {
     expect(config).toBeDefined();
     expect(typeof config.openrouterApiKey).toBe('string');
     expect(typeof config.anthropicApiKey).toBe('string');
-    expect(typeof config.neonDatabaseUrl).toBe('string');
     expect(typeof config.whitecircleApiToken).toBe('string');
     expect(typeof config.whitecircleEndpoint).toBe('string');
     expect(typeof config.judgeModel).toBe('string');
@@ -22,5 +21,10 @@ describe('Config', () => {
   it('judgeModel has a sensible default', async () => {
     const { config } = await import('../shared/config.js');
     expect(config.judgeModel).toMatch(/claude/);
+  });
+
+  it('does not contain neonDatabaseUrl', async () => {
+    const { config } = await import('../shared/config.js');
+    expect(config).not.toHaveProperty('neonDatabaseUrl');
   });
 });
