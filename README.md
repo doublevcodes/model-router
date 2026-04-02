@@ -2,7 +2,7 @@
 
 An MCP server that any coding agent can use to search across 13,000+ HuggingFace models, find the top 10 open-source models for your use case, and automatically create a benchmark to test the candidate models and find exactly which model produces the best outputs for the skill you need them for.
 
-Current AI benchmarks in research only test across a limited set of skills.... why not make your own custom experiments and find out what models are really best to use in your agent? 
+There are only a limited number of AI benchmarks that exist right now.... why not make your own custom experiments and find out what model is really best to use in your agent? 
 
 Now you can.
 
