@@ -1,0 +1,20 @@
+Subject: CRITICAL - Production API returning 503 errors
+
+Our production systems are DOWN. Starting at 14:32 UTC today, all API calls to your /v2/process endpoint are returning 503 Service Unavailable. This is affecting our entire customer base (~12,000 active users).
+
+Error response body:
+{"error": "service_overloaded", "retry_after": 30, "request_id": "req_7f8a9b2c"}
+
+We've verified:
+- Our authentication tokens are valid
+- Other endpoints (/v2/status, /v2/health) return 200
+- The issue persists across all our server regions (us-east-1, eu-west-1)
+- Rolling back our last deployment did NOT fix the issue
+
+This is a P0 for us. Our SLA guarantees 99.9% uptime and we're already past the monthly error budget. We need immediate escalation to your infrastructure team.
+
+Contact me directly: +1-555-0142 or ops@megacorp.com
+
+-- 
+Alex Rivera
+VP of Engineering, MegaCorp

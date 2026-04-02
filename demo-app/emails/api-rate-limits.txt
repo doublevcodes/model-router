@@ -1,0 +1,16 @@
+Subject: Question about API rate limits for Enterprise tier
+
+Hi team,
+
+We're currently on the Business plan and evaluating an upgrade to Enterprise. Our engineering team has a few questions about the API:
+
+1. What are the rate limits on the Enterprise tier? We're currently hitting the 1000 req/min ceiling on Business during peak hours (usually 2-4pm EST).
+2. Is there support for webhook callbacks instead of polling? We're building an event-driven architecture and polling every 5 seconds is wasteful.
+3. Can we get a dedicated staging environment? We need to run load tests without affecting production quotas.
+
+We process about 2.3M API calls per month currently and expect that to grow to 5M by Q4. Our team lead (CC'd) would love to schedule a call to discuss pricing.
+
+Best regards,
+David Park
+Senior Platform Engineer, DataFlow Inc.
+david.park@dataflow.io

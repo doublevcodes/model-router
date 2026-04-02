@@ -1,0 +1,14 @@
+Subject: Re: Thanks for the quick help! One more thing...
+
+Hey team,
+
+Just wanted to say thanks again for fixing the export issue last week - the CSV downloads are working perfectly now. Your support is honestly one of the reasons we stick with your platform.
+
+Quick follow-up though: is there a way to schedule automatic exports? Like, have a CSV of our weekly analytics sent to our team Slack channel every Monday at 9am? I noticed there's a "Scheduled Reports" section in settings but it's grayed out on our plan (Team tier).
+
+If that's a paid add-on, could you let me know the pricing? We'd probably want it for 3 different report types.
+
+Cheers,
+Maria Santos
+Head of Analytics, BrightPath
+maria@brightpath.co
