@@ -3,6 +3,7 @@
     "switchboard": {
       "command": "npx",
       "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "/Users/oliverpryce/Documents/Hackathons/CURSOR HACK/model-router-1",
       "env": {
         "OPENROUTER_API_KEY": "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",
         "ANTHROPIC_API_KEY": "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",

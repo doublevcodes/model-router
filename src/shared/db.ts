@@ -5,8 +5,10 @@ import { randomUUID } from 'crypto';
 import type { BenchmarkRun, BenchmarkResult, Model, ModelSummary } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(__dirname, '../../data');
-const STORE_PATH = resolve(DATA_DIR, 'store.json');
+const STORE_PATH = process.env.SWITCHBOARD_STORE_PATH?.trim()
+  ? resolve(process.env.SWITCHBOARD_STORE_PATH.trim())
+  : resolve(__dirname, '../../data/store.json');
+const DATA_DIR = dirname(STORE_PATH);
 
 interface Store {
   runs: Array<{
@@ -69,7 +71,14 @@ function saveStore(store: Store): void {
 
 let store = loadStore();
 
+/** Reload store from disk so long-lived MCP/API processes see external updates (e.g. seed script). Skipped under Vitest so tests use in-memory state only. */
+function reloadFromDiskIfNotTest(): void {
+  if (process.env.VITEST === 'true') return;
+  store = loadStore();
+}
+
 export async function insertBenchmarkRun(useCase: string, useCaseSlug: string): Promise<string> {
+  reloadFromDiskIfNotTest();
   const id = randomUUID();
   store.runs.push({
     id,
@@ -84,6 +93,7 @@ export async function insertBenchmarkRun(useCase: string, useCaseSlug: string): 
 }
 
 export async function updateRunStatus(runId: string, status: string): Promise<void> {
+  reloadFromDiskIfNotTest();
   const run = store.runs.find((r) => r.id === runId);
   if (run) {
     run.status = status;
@@ -95,6 +105,7 @@ export async function updateRunStatus(runId: string, status: string): Promise<vo
 }
 
 export async function upsertModel(model: Model): Promise<void> {
+  reloadFromDiskIfNotTest();
   const existing = store.models.find((m) => m.id === model.openrouterId);
   if (existing) {
     existing.name = model.name;
@@ -116,6 +127,7 @@ export async function upsertModel(model: Model): Promise<void> {
 }
 
 export async function insertTestCase(runId: string, testCase: { input: string; expectedBehavior: string; category: string }): Promise<string> {
+  reloadFromDiskIfNotTest();
   const id = randomUUID();
   store.test_cases.push({
     id,
@@ -141,6 +153,7 @@ export async function insertBenchmarkResult(result: {
   safetyViolations: string[];
   judgeReasoning: string;
 }): Promise<string> {
+  reloadFromDiskIfNotTest();
   const id = randomUUID();
   store.results.push({
     id,
@@ -162,6 +175,7 @@ export async function insertBenchmarkResult(result: {
 }
 
 export async function getRunById(runId: string): Promise<BenchmarkRun | null> {
+  reloadFromDiskIfNotTest();
   const run = store.runs.find((r) => r.id === runId);
   if (!run) return null;
   const testCases = store.test_cases.filter((tc) => tc.run_id === runId);
@@ -183,6 +197,7 @@ export async function getRunById(runId: string): Promise<BenchmarkRun | null> {
 }
 
 export async function getResultsByRun(runId: string): Promise<BenchmarkResult[]> {
+  reloadFromDiskIfNotTest();
   return store.results
     .filter((r) => r.run_id === runId)
     .sort((a, b) => b.score - a.score)
@@ -203,6 +218,7 @@ export async function getResultsByRun(runId: string): Promise<BenchmarkResult[]>
 }
 
 export async function getModelSummaries(runId: string): Promise<ModelSummary[]> {
+  reloadFromDiskIfNotTest();
   const runResults = store.results.filter((r) => r.run_id === runId);
   const byModel = new Map<string, typeof runResults>();
 
@@ -239,6 +255,7 @@ export async function getModelSummaries(runId: string): Promise<ModelSummary[]> 
 }
 
 export async function searchExistingResults(useCaseSlug: string): Promise<{ runId: string; useCase: string; summaries: ModelSummary[] }[]> {
+  reloadFromDiskIfNotTest();
   const slug = useCaseSlug.toLowerCase();
   const matchingRuns = store.runs
     .filter((r) => r.use_case_slug.toLowerCase().includes(slug) && r.status === 'completed')
@@ -254,12 +271,14 @@ export async function searchExistingResults(useCaseSlug: string): Promise<{ runI
 }
 
 export async function getAllRuns(): Promise<any[]> {
+  reloadFromDiskIfNotTest();
   return [...store.runs].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }
 
 export async function searchRuns(query: string): Promise<any[]> {
+  reloadFromDiskIfNotTest();
   const q = query.toLowerCase();
   return store.runs
     .filter((r) => r.use_case.toLowerCase().includes(q))
